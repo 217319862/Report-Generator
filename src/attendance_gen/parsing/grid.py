@@ -1,23 +1,22 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import cv2
 import numpy as np
-from typing import cast
 import pymupdf
 from numpy.typing import NDArray
 
-
 GrayImage = NDArray[np.uint8]
 
-_LINE_LENGTH_DIVISOR = 30
+_LINE_LENGTH_DIVISOR = 30  # קו נחשב רק אם ארוך לפחות 1/30 מרוחב או גובה הדף
 _CLUSTER_GAP = 12  # קווים במרחק של עד 12 פיקסלים הם אותו קו
 _DEFAULT_MIN_FRACTION = 0.6
 
 
 @dataclass(frozen=True, slots=True)
 class Grid:
-
+    """קואורדינטות הקווים של הטבלה, מסודרות משמאל לימין ומלמעלה למטה."""
 
     xs: tuple[int, ...]
     ys: tuple[int, ...]
