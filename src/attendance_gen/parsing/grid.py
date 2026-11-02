@@ -3,13 +3,15 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from typing import cast
 import pymupdf
 from numpy.typing import NDArray
+
 
 GrayImage = NDArray[np.uint8]
 
 _LINE_LENGTH_DIVISOR = 30
-_CLUSTER_GAP = 3
+_CLUSTER_GAP = 12  # קווים במרחק של עד 12 פיקסלים הם אותו קו
 _DEFAULT_MIN_FRACTION = 0.6
 
 
@@ -42,9 +44,10 @@ def render_page(pdf_path: Path, *, dpi: int = 300, page_index: int = 0) -> GrayI
 
 def _binarize(gray: GrayImage) -> GrayImage:
     """הופך את התמונה לשחור-לבן כשהקווים והטקסט לבנים."""
-    return cv2.adaptiveThreshold(  # type: ignore[no-any-return]
+    binary = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 35, 15
     )
+    return cast(GrayImage, binary)
 
 
 def _extract_lines(binary: GrayImage, *, horizontal: bool) -> GrayImage:
@@ -52,7 +55,7 @@ def _extract_lines(binary: GrayImage, *, horizontal: bool) -> GrayImage:
     size = max((width if horizontal else height) // _LINE_LENGTH_DIVISOR, 10)
     shape = (size, 1) if horizontal else (1, size)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, shape)
-    return cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)  # type: ignore[no-any-return]
+    return cast(GrayImage, cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel))
 
 
 def _positions(mask: GrayImage, *, axis: int, min_fraction: float) -> tuple[int, ...]:
@@ -75,12 +78,12 @@ def find_grid(gray: GrayImage, *, min_fraction: float = _DEFAULT_MIN_FRACTION) -
     )
 
 
-def draw_grid(gray: GrayImage, grid: Grid) -> NDArray[np.uint8]:
-
+def draw_grid(gray: GrayImage, grid: Grid) -> GrayImage:
+    """תמונה צבעונית עם הקווים שזוהו, לבדיקה ויזואלית."""
     image = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
     height, width = gray.shape
     for x in grid.xs:
         cv2.line(image, (x, 0), (x, height), (0, 0, 255), 2)
     for y in grid.ys:
         cv2.line(image, (0, y), (width, y), (255, 0, 0), 2)
-    return image  # type: ignore[no-any-return]
+    return cast(GrayImage, image)
