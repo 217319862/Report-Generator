@@ -12,7 +12,7 @@ DEFAULT_TIMEOUT_SECONDS = 60
 
 
 class OcrError(RuntimeError):
-    """נזרקת כשקריאת הקובץ נכשלת."""
+    """נזרקת כשקריאת הקובץ נכשלת"""
 
 
 def ensure_tesseract() -> None:
