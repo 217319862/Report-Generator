@@ -1,11 +1,18 @@
 from collections.abc import Callable
-from datetime import time, timedelta
+from datetime import date, time, timedelta
 from decimal import Decimal
 
-from attendance_gen.domain.models import AttendanceReport, AttendanceRow, ReportType
+from attendance_gen.domain.models import (
+    AttendanceReport,
+    AttendanceRow,
+    ReportType,
+    hebrew_weekday,
+)
 from attendance_gen.generation.layout import ColumnSpec, LayoutSpec, SummaryItem
 
 _ZERO = Decimal(0)
+_SATURDAY = 5  # weekday של Python
+_MONTH_ABBR = ("ינו", "פבר", "מרץ", "אפר", "מאי", "יונ", "יול", "אוג", "ספט", "אוק", "נוב", "דצמ")
 
 
 def _fixed(value: Decimal) -> str:
@@ -20,6 +27,18 @@ def _clock(value: time) -> str:
     return value.strftime("%H:%M")
 
 
+def _clock_short(value: time) -> str:
+    return f"{value.hour}:{value.minute:02d}"
+
+
+def _short_date(day: date) -> str:
+    return f"{day.day}/{day.month}/{day:%y}"
+
+
+def _shekel(value: Decimal | None) -> str:
+    return "" if value is None else f"₪ {value:,.2f}"
+
+
 def _duration(value: timedelta | None) -> str:
     if value is None:
         return ""
@@ -29,6 +48,14 @@ def _duration(value: timedelta | None) -> str:
 
 def _day_name(row: AttendanceRow) -> str:
     return "שבת" if row.day.weekday() == 5 else f"יום {row.weekday_he}"
+
+
+def _month_abbr(report: AttendanceReport) -> str:
+    """"ספט-22": קיצור החודש ושתי ספרות של השנה, כמו בכותרת הכרטיס המקורי."""
+    if not report.rows:
+        return report.period_label
+    day = report.rows[0].day
+    return f"{_MONTH_ABBR[day.month - 1]}-{day:%y}"
 
 
 def _sum(report: AttendanceReport, getter: Callable[[AttendanceRow], Decimal]) -> Decimal:
@@ -68,4 +95,33 @@ TYPE_A_LAYOUT = LayoutSpec(
     show_title=False,
 )
 
-LAYOUTS: dict[ReportType, LayoutSpec] = {ReportType.TYPE_A: TYPE_A_LAYOUT}
+TYPE_B_LAYOUT = LayoutSpec(
+    title="כרטיס עובד לחודש:",
+    columns=(
+        ColumnSpec("תאריך", 25, lambda r: _short_date(r.day), blank=_short_date),
+        ColumnSpec("יום בשבוע", 25, lambda r: r.weekday_he, blank=hebrew_weekday),
+        ColumnSpec("שעת כניסה", 25, lambda r: _clock_short(r.clock_in)),
+        ColumnSpec("שעת יציאה", 25, lambda r: _clock_short(r.clock_out)),
+        ColumnSpec("סה\"כ שעות", 25, lambda r: _fixed(r.total_hours)),
+        ColumnSpec("הערות", 55, lambda r: r.note or ""),
+    ),
+    summary=(
+        SummaryItem("סה\"כ ימי עבודה לחודש", lambda rep: str(rep.days_count)),
+        SummaryItem("סה\"כ שעות חודשיות", lambda rep: _fixed(rep.total_hours)),
+        SummaryItem("מחיר לשעה", lambda rep: _shekel(rep.hourly_rate)),
+        SummaryItem("סה\"כ לתשלום", lambda rep: _shekel(rep.total_pay)),
+    ),
+    summary_on_top=True,
+    fill_month=True,
+    shaded_weekdays=frozenset({_SATURDAY}),
+    grid=True,
+    summary_label_mm=50.0,
+    period_text=_month_abbr,
+    show_company=False,  # במקור אין שורת חברה
+    employee_label="שם העובד:",
+)
+
+LAYOUTS: dict[ReportType, LayoutSpec] = {
+    ReportType.TYPE_A: TYPE_A_LAYOUT,
+    ReportType.TYPE_B: TYPE_B_LAYOUT,
+}

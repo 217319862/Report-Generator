@@ -59,17 +59,25 @@ class BaseTransformationStrategy(ABC):
         rng = random.Random(seed)
         days = self._choose_days(parsed, rng)
         rows = tuple(self._make_row(day, self._plan_shift(rng, parsed.shifts)) for day in days)
-        report = AttendanceReport(
-            report_type=self.report_type,
-            rows=rows,
-            period_label=f"{parsed.month:02d}/{parsed.year}",
-        )
+        report = self._make_report(parsed, rows)
         self._verify(report)
         return report
 
     @abstractmethod
     def _build_row(self, day: date, shift: PlannedShift, total: Decimal) -> AttendanceRow:
         """החלק שמשתנה בין סוגי דוחות: אילו שדות ממלאים וכיצד."""
+
+    def _expected_days(self, parsed: ParseResult) -> int:
+        """כמה ימי עבודה הדוח החדש צריך להכיל, בקירוב. ברירת מחדל: השורות שנקראו."""
+        return len(parsed.shifts)
+
+    def _make_report(self, parsed: ParseResult, rows: tuple[AttendanceRow, ...]) -> AttendanceReport:
+        """בונה את הדוח מהשורות. סוג שצריך שדות נוספים (מחיר, שם) דורס את זה."""
+        return AttendanceReport(
+            report_type=self.report_type,
+            rows=rows,
+            period_label=f"{parsed.month:02d}/{parsed.year}",
+        )
 
     def _make_row(self, day: date, shift: PlannedShift) -> AttendanceRow:
         return self._build_row(day, shift, shift.net_hours)
@@ -82,7 +90,7 @@ class BaseTransformationStrategy(ABC):
     def _choose_days(self, parsed: ParseResult, rng: random.Random) -> list[date]:
         workdays = self._workdays(parsed.year, parsed.month)
         variation = self.rules.days_variation
-        wanted = len(parsed.shifts) + rng.randint(-variation, variation)
+        wanted = self._expected_days(parsed) + rng.randint(-variation, variation)
         count = max(1, min(wanted, len(workdays)))
         return sorted(rng.sample(workdays, count))
 

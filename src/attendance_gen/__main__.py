@@ -10,6 +10,7 @@ from attendance_gen.formats import DEFAULT_FORMATS
 from attendance_gen.generation.base import RenderError
 from attendance_gen.generation.fonts import FontNotFoundError
 from attendance_gen.generation.pdf_renderer import PdfRenderer
+from attendance_gen.parsing.base_parser import Period
 from attendance_gen.parsing.classifier import UnknownReportTypeError
 from attendance_gen.parsing.input_check import InputError
 from attendance_gen.parsing.ocr import OcrError
@@ -29,6 +30,21 @@ EXPECTED_ERRORS = (
     FontNotFoundError,
 )
 
+_MIN_YEAR = 2000
+_MAX_YEAR = 2100
+
+
+def _period(text: str) -> Period:
+    """קורא תקופה בפורמט YYYY-MM, למשל 2023-01."""
+    try:
+        year_text, month_text = text.split("-")
+        year, month = int(year_text), int(month_text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("הפורמט הנדרש הוא YYYY-MM, למשל 2023-01") from None
+    if not (_MIN_YEAR <= year <= _MAX_YEAR and 1 <= month <= 12):
+        raise argparse.ArgumentTypeError("שנה או חודש מחוץ לטווח")
+    return year, month
+
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -40,6 +56,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--font", type=Path, default=None, help="קובץ פונט .ttf עם תמיכה בעברית")
     parser.add_argument("--company", default="חברה לדוגמה")
     parser.add_argument("--employee", default="עובד לדוגמה")
+    parser.add_argument(
+        "--period",
+        type=_period,
+        default=None,
+        help="חודש הדוח בפורמט YYYY-MM, כשאי אפשר לקרוא אותו מהקובץ. משפיע רק על TYPE_B",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
 
@@ -61,7 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         renderer = PdfRenderer(args.font, company=args.company, employee=args.employee)
         result = Pipeline(DEFAULT_FORMATS, renderer).run(
-            args.pdf, args.output_dir, overwrite=args.overwrite
+            args.pdf, args.output_dir, overwrite=args.overwrite, period=args.period
         )
     except EXPECTED_ERRORS as exc:
         print(f"שגיאה: {exc}", file=sys.stderr)
@@ -70,6 +92,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     warnings = sum(1 for issue in result.issues if issue.severity is Severity.WARNING)
     print(f"נוצר: {result.output_path}")
     print(f"סוג דוח: {result.report_type}, שורות: {result.rows}, אזהרות קריאה: {warnings}")
+    if args.verbose:
+        for issue in result.issues:
+            print(f"{issue.code}: {issue.message}")
     return 0
 
 

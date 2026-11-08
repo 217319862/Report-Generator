@@ -7,6 +7,7 @@ from attendance_gen.domain.models import ReportType
 from attendance_gen.domain.validation import Issue
 from attendance_gen.formats import ReportFormat
 from attendance_gen.generation.base import BaseRenderer, safe_output_path
+from attendance_gen.parsing.base_parser import Period
 from attendance_gen.parsing.classifier import classify
 from attendance_gen.parsing.input_check import check_pdf
 from attendance_gen.parsing.ocr import pdf_to_text
@@ -39,8 +40,17 @@ class Pipeline:
         self._renderer = renderer
         self._ocr = ocr
 
-    def run(self, pdf_path: Path, output_dir: Path, *, overwrite: bool = False) -> PipelineResult:
+    def run(
+        self,
+        pdf_path: Path,
+        output_dir: Path,
+        *,
+        overwrite: bool = False,
+        period: Period | None = None,
+    ) -> PipelineResult:
         # כשלון מהיר: קלט ויעד נבדקים לפני ה-OCR היקר
+        if period is not None and not 1 <= period[1] <= 12:
+            raise ValueError(f"invalid month in period: {period[1]}")
         check_pdf(pdf_path)
         destination = safe_output_path(
             output_dir, f"{pdf_path.stem}_sample", self._renderer.extension, overwrite=overwrite
@@ -49,7 +59,7 @@ class Pipeline:
         text = self._ocr(pdf_path)
         parser = classify(text, [f.parser for f in self._formats.values()])
         fmt = self._formats[parser.report_type]
-        parsed = fmt.parser.parse(text)
+        parsed = fmt.parser.parse_document(pdf_path, text, period=period)
 
         seed = seed_from_bytes(pdf_path.read_bytes())
         report = fmt.strategy.transform(parsed, seed)
