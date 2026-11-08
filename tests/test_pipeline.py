@@ -70,3 +70,24 @@ def test_duplicate_formats_are_rejected(renderer: PdfRenderer) -> None:
 
 def test_cli_returns_error_code_for_missing_file(tmp_path: Path) -> None:
     assert main([str(tmp_path / "nope.pdf")]) == 2
+
+
+def test_invalid_period_is_rejected_before_any_work(tmp_path: Path, renderer: PdfRenderer) -> None:
+    source = make_pdf(tmp_path / "in.pdf")
+    pipeline = Pipeline(DEFAULT_FORMATS, renderer, ocr=lambda _: REAL_TEXT)
+    with pytest.raises(ValueError, match="invalid month"):
+        pipeline.run(source, tmp_path / "out", period=(2023, 13))
+    assert not (tmp_path / "out").exists()
+
+
+def test_period_is_ignored_by_type_a(tmp_path: Path, renderer: PdfRenderer) -> None:
+    source = make_pdf(tmp_path / "in.pdf")
+    pipeline = Pipeline(DEFAULT_FORMATS, renderer, ocr=lambda _: REAL_TEXT)
+    result = pipeline.run(source, tmp_path / "out", period=(2023, 1))
+    assert result.report_type is ReportType.TYPE_A
+
+
+def test_cli_rejects_malformed_period(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as info:
+        main([str(tmp_path / "in.pdf"), "--period", "2023-13"])
+    assert info.value.code == 2
