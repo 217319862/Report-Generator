@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import time, timedelta
+from decimal import Decimal
 
 from attendance_gen.domain.models import ReportType
 from attendance_gen.domain.validation import Issue
@@ -23,6 +24,10 @@ class ParseResult:
     shifts: tuple[ObservedShift, ...]
     issues: tuple[Issue, ...]
     candidate_lines: int
+    hourly_rate: Decimal | None = None  # רק בדוחות שמציגים מחיר לשעה (TYPE_B)
+    # מספרי השורות (מ-1) בטבלה שנראו כימי עבודה, גם אם לא נקראו עד הסוף.
+    # ב-TYPE_B שורה N היא היום ה-N בחודש. ריק = הפרסר לא מדווח על ימים.
+    workday_lines: tuple[int, ...] = ()
 
     @property
     def coverage(self) -> float:

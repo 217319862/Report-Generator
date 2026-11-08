@@ -11,8 +11,7 @@ GrayImage = NDArray[np.uint8]
 
 _LINE_LENGTH_DIVISOR = 30  # קו נחשב רק אם ארוך לפחות 1/30 מרוחב או גובה הדף
 _CLUSTER_GAP = 12  # קווים במרחק של עד 12 פיקסלים הם אותו קו
-_DEFAULT_MIN_FRACTION = 0.6
-
+_DEFAULT_MIN_FRACTION = 0.35
 
 @dataclass(frozen=True, slots=True)
 class Grid:
