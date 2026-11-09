@@ -48,6 +48,9 @@ class Pipeline:
         overwrite: bool = False,
         period: Period | None = None,
     ) -> PipelineResult:
+
+        if not pdf_path.is_file():
+            raise FileNotFoundError(f"קובץ ה-PDF אינו נמצא: {pdf_path}")
         # כשלון מהיר: קלט ויעד נבדקים לפני ה-OCR היקר
         if period is not None and not 1 <= period[1] <= 12:
             raise ValueError(f"invalid month in period: {period[1]}")
